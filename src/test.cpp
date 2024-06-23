@@ -6,13 +6,11 @@
 #include "geometry_msgs/msg/vector3.hpp"
 #include <random>
 
-
-
-
+#define FRONT_F 10000
+#define PLATFORM_F 1000
 
 //生成高斯噪音
-double generateGaussianNoise(double mean, double std_dev)
-{
+double generateGaussianNoise(double mean, double std_dev) {
     std::random_device rd;
     std::mt19937 gen(rd());
     std::normal_distribution<> distr(mean, std_dev);
@@ -20,15 +18,10 @@ double generateGaussianNoise(double mean, double std_dev)
 }
 
 
-
-
-
-class Simulator : public rclcpp::Node
-{
+class Simulator : public rclcpp::Node {
 
 public:
-    Simulator(std::string name) : Node(name)
-    {
+    Simulator(std::string name) : Node(name) {
         Kalman_fillter_CA = new Kalman(0.001);
         Kalman_fillter_CA->Q_set(100);
         Kalman_fillter_CA->R_set(0.001);
@@ -43,18 +36,18 @@ public:
         fillted_publisher_ = this->create_publisher<geometry_msgs::msg::Vector3>("fillted", 1);
 
         //用于kalman运行的定时器，和云台输出频率一致
-        kalman_timer_ = create_wall_timer(std::chrono::microseconds(1000),
-                                   [this] { timer_cb(); },callback_group_);
+        kalman_timer_ = create_wall_timer(std::chrono::microseconds(PLATFORM_F),
+                                          [this] { timer_cb(); }, callback_group_);
         //用于生成原始数据的定时器
-        simulator_timer_ = create_wall_timer(std::chrono::microseconds(10000),
-                                         [this] { simulator_cb(); },callback_group_);
+        simulator_timer_ = create_wall_timer(std::chrono::microseconds(FRONT_F),
+                                             [this] { simulator_cb(); }, callback_group_);
 
-        RCLCPP_INFO(this->get_logger(),"节点%s已启动",name.c_str());
+        RCLCPP_INFO(this->get_logger(), "节点%s已启动", name.c_str());
     }
 
 private:
 
-    Kalman* Kalman_fillter_CA;
+    Kalman *Kalman_fillter_CA;
 
     rclcpp::CallbackGroup::SharedPtr callback_group_;
 
@@ -71,45 +64,28 @@ private:
 
     std::atomic<bool> isunsuccessful = true;
 
-    int Times=10;
-    void timer_cb()
-    {
-        RCLCPP_INFO(this->get_logger(),"kalman");
+    void timer_cb() {
+        RCLCPP_INFO(this->get_logger(), "kalman");
 
-
-        if(!isunsuccessful)
-        {
-            RCLCPP_WARN_STREAM(this->get_logger(),"Success");
-            Eigen::Matrix<double,1,1> meassure;
+        Eigen::Vector2d CA_fillter_output = Kalman_fillter_CA->predict();
+        if (!isunsuccessful) {
+            Eigen::Matrix<double, 1, 1> meassure;
             meassure << simulate_pos_x;
 
-
-            Eigen::Vector2d CA_fillter_output  = Kalman_fillter_CA->predict();
-            Times++;
-            if(Times>=10){
-                CA_fillter_output = Kalman_fillter_CA->update(meassure);
-                Times=0;
-                isunsuccessful = true;
-            }
-
-
-
-
-            geometry_msgs::msg::Vector3 fillted;
-            fillted.x = CA_fillter_output(0);
-            fillted.y = CA_fillter_output(1);
-            //fillted.z = CA_fillter_output(2);
-
-            fillted_publisher_->publish(fillted);
+            CA_fillter_output = Kalman_fillter_CA->update(meassure);
+            isunsuccessful = true;
 
         }
+        geometry_msgs::msg::Vector3 fillted;
+        fillted.x = CA_fillter_output(0);
+        fillted.y = CA_fillter_output(1);
+        fillted_publisher_->publish(fillted);
 
     }
 
 
     //测试直线运动
-    void simulator_cb()
-    {
+    void simulator_cb() {
         isunsuccessful = true;
         static double pos_x = 0;
         static double vec_x = 3;
@@ -117,15 +93,15 @@ private:
 
         static uint16_t error_inject_cnt;
 
-        RCLCPP_INFO(this->get_logger(),"simulator");
+        RCLCPP_INFO(this->get_logger(), "simulator");
 
         pos_x = pos_x + vec_x * T;
-        if(abs(pos_x)>5)
-            vec_x*=-1;
+        if (abs(pos_x) > 5)
+            vec_x *= -1;
 
         simulate_pos_x = pos_x + generateGaussianNoise(0, 0.05);
 
-        if(error_inject_cnt > 150)//故障注入
+        if (error_inject_cnt > 150)//故障注入
         {
             simulate_pos_x += 2;//注入1m错误
             error_inject_cnt = 0;
@@ -133,7 +109,7 @@ private:
         error_inject_cnt++;
 
         isunsuccessful = false;
-        RCLCPP_WARN_STREAM(this->get_logger(),"OPEN");
+        RCLCPP_WARN_STREAM(this->get_logger(), "OPEN");
 
         geometry_msgs::msg::Vector3 raw;
         raw.x = simulate_pos_x;
@@ -144,9 +120,8 @@ private:
 
 };
 
-int main(int argc,char** argv)
-{
-    rclcpp::init(argc,argv);
+int main(int argc, char **argv) {
+    rclcpp::init(argc, argv);
     auto node = std::make_shared<Simulator>("kalman");
     rclcpp::spin(node);
     rclcpp::shutdown();
