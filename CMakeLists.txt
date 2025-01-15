@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(kalman_fiter)
+project(front_client)
 
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
@@ -17,10 +17,6 @@ endif()
 
 # find dependencies
 find_package(ament_cmake_auto REQUIRED)
-
-
-find_package(Eigen3 REQUIRED)
-include_directories(${EIGEN3_INCLUDE_DIR})
 
 ament_auto_find_build_dependencies()
 
@@ -40,20 +36,15 @@ if(BUILD_TESTING)
   ament_lint_auto_find_test_dependencies()
 endif()
 
-ament_auto_add_executable(test_node
-                          src/test.cpp
-                          src/kalman/kalman.cpp
-)
+include_directories(include)
+file(GLOB SRC src/*.cpp)
 
-ament_auto_add_executable(kalman
-        src/test.cpp
-        src/kalman/kalman.cpp
-        include/kalman/kalman.hpp
+ament_auto_add_executable(${PROJECT_NAME}_node
+                          ${SRC}
 )
-
 
 install(TARGETS
-        test_node
+        ${PROJECT_NAME}_node
         DESTINATION lib/${PROJECT_NAME}
 )
 ament_auto_package()
