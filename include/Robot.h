@@ -52,6 +52,7 @@ private:
     //系统初始化
     void initRobot();
     void publishMarkers();
+    void publishRobotInfo();
 
     //参数
     double height_;

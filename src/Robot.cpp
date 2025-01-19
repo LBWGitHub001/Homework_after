@@ -38,6 +38,7 @@ void Robot::timer_callback()
     t.transform.translation.z = center_.z;
     center_broadcaster_->sendTransform(t);
     publishMarkers();
+    publishRobotInfo();
 
 }
 
@@ -121,7 +122,42 @@ void Robot::publishMarkers()
         armor_marker_.pose.orientation.w = q.getW();
         armor_marker_.id = i;
         marker_array.markers.push_back(armor_marker_);
+
+        Armor armor;
+        armor.pose.orientation.x = q.getX();
+        armor.pose.orientation.y = q.getY();
+        armor.pose.orientation.z = q.getZ();
+        armor.pose.orientation.w = q.getW();
+        armor.number = "3";
+
     }
     markers_pub_->publish(marker_array);
+
+}
+
+void Robot::publishRobotInfo()
+{
+    RobotInfo msg;
+    msg.header.stamp = this->get_clock()->now();
+    msg.header.frame_id = "center";
+    msg.center = center_;
+    for (int i = 0; i < 4; i++)
+    {
+        double tmp_yaw = yaw_ + i*M_PI/2;
+
+        tf2::Quaternion q;
+        q.setRPY(0,-0.2,tmp_yaw);
+
+        Armor armor;
+        armor.pose.orientation.x = q.getX();
+        armor.pose.orientation.y = q.getY();
+        armor.pose.orientation.z = q.getZ();
+        armor.pose.orientation.w = q.getW();
+        armor.number = "3";
+
+        msg.armors.push_back(armor);
+    }
+
+    robot_pub_->publish(msg);
 
 }
